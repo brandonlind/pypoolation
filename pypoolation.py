@@ -361,7 +361,7 @@ def launch_engines(engines, profile):
 def attach_data(**kwargs) -> None:
     """Load object to engines."""
     print(ColorText("\nAdding data to engines ...").bold())
-    print(ColorText("\tWARN: Watch free mem in another terminal window: 'watch free -h'").warn())
+    print(ColorText("\tWARN: Watch available mem in another terminal window: 'watch free -h'").warn())
     print(ColorText("\tWARN: If available mem gets too low, kill engines and restart pypoolation with fewer engines: 'ipcluster stop'").warn())
     for key,value in kwargs.items():
         if key != 'dview':
@@ -519,15 +519,20 @@ def get_windows(chrom, **kwargs):
 
 
 def write_tmp_file(measures, chrom, pop, statistic):
-    """Write window file to /tmp, combine later."""
+    """Write window file to /tmp, combine later.
+    
+    # TODO: include flag values in outfile name
+    """
     import tempfile, os
 
     file = os.path.join(tempfile.gettempdir(), f"{chrom}_{statistic}_{pop}.txt")
     with open(file, 'w') as o:
-        o.write(f"chrom\tsnp\tsnpcount\tcoveredFraction\tstatistitc ({statistic})\n")
+        o.write(f"chrom\tlocus\tsnpcount\tcoveredFraction\tstatistitc ({statistic})\n")
         lines = []
+        print ("chrom = ", chrom)
         for locus,dic in measures.items():
-            lines.append('\t'.join([chrom, locus, dic['covercount'], dic['covfraction'], dic[statistic]]))
+            lines.append('\t'.join([chrom, locus, str(dic['covercount']),
+                                    str(dic['covfraction']), str(dic[statistic])] ))
         o.write("\n".join(lines))
         
     return file
@@ -540,10 +545,11 @@ def send_windows(*args, **kwargs):
     # TODO : make sure this will work for other measures other than D
     """
     import numpy, varmath as vm
-    chrom = args
+    chrom = args[0]
     
     # gather kwargs
     args = kwargs['args']
+    print('lucky args = ', args)
     vm_kwargs = {'mincov':args.mincov,
                  'maxcov':args.maxcov,
                  'poolsize':ploidy[kwargs['pop']],
@@ -563,11 +569,11 @@ def send_windows(*args, **kwargs):
             print('window keys = ', window.keys())
             print('window["snps"].keys() = ', window["snps"].keys())
             measures[locus][args.measure] = vm.VarianceExactCorrection(**vm_kwargs).calculate_measure(**window)
-        measures[locus]['covercount'] = window[locus]['covercount']  # number of snps passing filters in window
-        measures[locus]['covfraction'] = window[locus]['covercount'] / args.windowsize
+        measures[locus]['covercount'] = window['covercount']  # number of snps passing filters in window
+        measures[locus]['covfraction'] = window['covercount'] / args.windowsize
     
     # write the file
-    file = write_tmp_file(measures, chrom, args.pop, args.measure)
+    file = write_tmp_file(measures, chrom, kwargs['pop'], args.measure)
             
     return file
 
@@ -580,8 +586,8 @@ def send_chrom_to_calculator(snps, lview, **kwargs):
     """
     jobs = []
     for chrom in uni(snps[kwargs['chromcol']]):
-#         jobs.append(lview.apply_async(send_windows, *[chrom], **kwargs))
-        jobs.append(send_windows(*[chrom], **kwargs))
+        jobs.append(lview.apply_async(send_windows, *[chrom], **kwargs))
+#         jobs.append(send_windows(*[chrom], **kwargs))
 
     # wait until jobs finish
     watch_async(jobs, phase='send_windows')
@@ -596,6 +602,7 @@ def send_chrom_to_calculator(snps, lview, **kwargs):
     file = op.join(args.outdir, f"{args.measure}_{pop}.txt")
     measure_df.to_csv(file, sep='\t', index=False)
     # TODO: delete tmp files?
+    return file
     
 
 def main():
@@ -629,7 +636,8 @@ def main():
         print('\tlen(pidiv_buffer) = ', len(pidiv_buffer))
         
         # attach functions and dict to engines (used in and downstream of send_to_calculate())
-        attach_data(send_windows=send_windows,
+        attach_data(write_tmp_file=write_tmp_file,
+                    send_windows=send_windows,
                     send_chrom_to_calculator=send_chrom_to_calculator,
                     get_windows=get_windows,
                     pidiv_buffer=pidiv_buffer,

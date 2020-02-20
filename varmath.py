@@ -4,9 +4,9 @@ import numpy, typing
 
 def get_nbase_buffer(poolsize:int, cov:int) -> float:
     def _get_pij_matrix(maxcoverage:int, poolsize:int) -> numpy.matrix:
-        import numpy
+        import numpy, pandas
         jboundary = maxcoverage if maxcoverage < poolsize else poolsize
-        matrix = numpy.matrix(pd.DataFrame(index=range(0, maxcoverage+1, 1),
+        matrix = numpy.matrix(pandas.DataFrame(index=range(0, maxcoverage+1, 1),
                                            columns=range(0, jboundary+1, 1)))
         matrix[0,0] = 1
         for i in range(1, maxcoverage+1, 1):
@@ -42,10 +42,44 @@ def get_nbase_buffer(poolsize:int, cov:int) -> float:
     return nbase
 
 
-def get_an_buffer(n:int):
+def get_an_buffer(n:float, an_buffer={}) -> float:
+    import math
+    n = math.floor(n)
+
+    if n in an_buffer.keys():
+        return an_buffer[n]
+    
+    an = 0
+    for i in range(1, n, 1):
+        an += 1/i
+    
+    an_buffer[n] = an
+
+    return an
 
 
-def get_betastar_calculator(n:int, ):
+def get_bn_buffer(n:float, bn_buffer:dict={}) -> float:
+    import math
+    n = math.floor(n)
+
+    if n in bn_buffer.keys():
+        return bn_buffer[n]
+
+    bn = 0
+    for i in range(1, n, 1):
+        bn += 1/(i**2)
+
+    bn_buffer[n] = bn
+
+    return bn
+
+
+def calculate_fstar(an:float, n:float):
+    return ((n - 3)/(an*(n - 1) - n))
+
+
+def get_betastar_calculator(n:float, bstar_buffer:dict={}) -> float:
+    print("n = ", n)
     from pypoolation import ColorText
 
     if not n > 1:
@@ -56,9 +90,9 @@ def get_betastar_calculator(n:int, ):
     if n in bstar_buffer.keys():
         return bstar_buffer[n]
 
-    an = get_an_buffer(n)  # TODO: write fxn()
-    bn = get_bn_buffer(n)  # TODO: write fxn()
-    myfs = calculate_fstar(an, n)
+    an = get_an_buffer(n)
+    bn = get_bn_buffer(n)
+    fs = calculate_fstar(an, n)
 
     t1 = (fs**2) * (bn - ((2*(n-1)) / ((n-1)**2)))
     st1 = bn * (8/(n-1))
@@ -84,7 +118,7 @@ def get_ddivisor(n:int, mincoverage:int, snps:dict, theta:int, nbase_buffer:dict
     alphastar = get_betastar_calculator(averagen)  # TODO: This's how it appears in popoolation code, is betastar_calc right??
     betastar = get_betastar_calculator(averagen)
     div = (alphastar/snpcount)*theta + (betastar*(theta**2))
-    pass
+    return div
 
 
 def get_thetadiv_buffer(b:int, n:int, M:int, thetadiv_buffer:dict) -> (float, dict):
@@ -189,7 +223,7 @@ def get_D_calculator(b:int, n:int, mincoverage:int, snps:dict, pidiv_buffer:dict
     """
     pi = get_pi_calculator(b, n, snps, pidiv_buffer)
     theta = get_theta_calculator(b, n, snps)
-    ddivsor = get_ddivisor(n, mincoverage, snps, theta)
+    ddivisor = get_ddivisor(n, mincoverage, snps, theta)
     
     if pi - theta == 0:
         return 0
