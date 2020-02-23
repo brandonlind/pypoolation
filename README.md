@@ -3,7 +3,7 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/1d35004dc83c4bf492286e4f71a477a0)](https://app.codacy.com/manual/brandonlind/pypoolation?utm_source=github.com&utm_medium=referral&utm_content=brandonlind/pypoolation&utm_campaign=Badge_Grade_Dashboard)
 
 # pypoolation
-Using ipcluster engines to parallelize calculations from [varscan_pipeline](https://github.com/CoAdapTree/varscan_pipeline) outfiles, report Tajimas'D and/or Tajima's pi and/or Watterson's theta over user-defined windows (as in [pypoolation](https://sourceforge.net/p/popoolation/code/HEAD/tree/trunk)). Alternatively, this code is likely to work relatively well with any txt files output by sending a VarScan vcf output to GATK's VariantsToTable.
+Using ipcluster engines to parallelize calculations from [varscan_pipeline](https://github.com/CoAdapTree/varscan_pipeline) outfiles, report Tajimas'D and/or Tajima's pi and/or Watterson's theta over user-defined windows (as in [pypoolation](https://sourceforge.net/p/popoolation/code/HEAD/tree/trunk/Modules/VarianceExactCorrection.pm)). Alternatively, this code is likely to work relatively well with any txt files output by sending a VarScan vcf output to GATK's VariantsToTable.
 
 ## Assumed environment
 This code was written and tested with python 3.7.6. It seemed that python3.8 had issues with parallelization implementation; this issue was not addressed in current version.
