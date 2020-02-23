@@ -275,7 +275,7 @@ def binomial_term(M:int, n:int, m:int, k:int) -> float:
 
     try:
         assert M > m
-    except AssertionError as e:
+    except AssertionError:
         print ('M = %s, k = %s' % (M,k))
         raise AssertionError
 
@@ -438,8 +438,7 @@ class VarianceExactCorrection:
     VarianceExactCorrection class object
     """
 
-    from pypoolation import ColorText
-    
+
     def __init__(self, **kwargs):
         self.mincoverage = kwargs['mincov']
         self.maxcoverage = kwargs['maxcov']
@@ -455,6 +454,8 @@ class VarianceExactCorrection:
 
     def calculate_measure(self, **kwargs):
         """Calculate and return specific measure (pi, theta, D) for a window."""
+        from pypoolation import ColorText
+
         measure = kwargs['measure'].lower()
         if measure == 'pi':
             return self._calculate_pi(snps=kwargs['snps'], covercount=kwargs['covercount'])
@@ -470,7 +471,9 @@ class VarianceExactCorrection:
             exit()
 
     def _calculate_pi(self, **kwargs):
-        """Calculate and return the average pi over the window.
+        """
+        Calculate and return the average pi over the window.
+
         Average is only used when calculating pi in isolation.
         """
         if kwargs['covercount'] == 0:
@@ -480,7 +483,9 @@ class VarianceExactCorrection:
         return pi_sum / kwargs['covercount']
 
     def _calculate_theta(self, **kwargs):
-        """Calculate and return the average theta over the window.
+        """
+        Calculate and return the average theta over the window.
+
         Average is only used when calculating pi in isolation.
         """
         if kwargs['covercount'] ==0:

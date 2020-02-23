@@ -5,7 +5,7 @@ TODO: if Tajima's D is selected, return pi and theta (and maybe ddivisor)
 """
 
 import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time, signal
-import itertools, pickle, numpy as np
+import pickle, numpy as np
 from os import path as op
 from typing import Union
 
@@ -44,18 +44,9 @@ def get_client(profile='default') -> tuple:
 
     return lview, dview
 
-def make_jobs(inputs:list, cmd, lview) -> list:
-    """Send each arg from inputs to a function command; async."""
-    print(f"making jobs for {cmd.__name__}")
-    jobs = []
-    for arg in tnb(inputs):
-        jobs.append(lview.apply_async(cmd, arg))
-    return jobs
-
 
 def watch_async(jobs:list, phase=None) -> None:
     """Wait until jobs are done executing, show progress bar."""
-
     from tqdm import trange
 
     print(ColorText(f"\nWatching {len(jobs)} {phase} jobs ...").bold())
@@ -75,7 +66,6 @@ class ColorText():
     """
     Use ANSI escape sequences to print colors +/- bold/underline to bash terminal.
     """
-
     def __init__(self, text:str):
         self.text = text
         self.ending = '\033[0m'
@@ -244,8 +234,7 @@ Default to analyze=All.''')
 
 
 def askforinput(msg='Do you want to proceed?', tab='', newline='\n'):
-    "Ask for input; if msg is default and input is no, exit."
-
+    """Ask for input; if msg is default and input is no, exit."""
     while True:
         inp = input(ColorText(f"{newline}{tab}INPUT NEEDED: {msg} \n{tab}(yes | no): ").warn().__str__()).lower()
         if inp in ['yes', 'no']:
@@ -260,10 +249,7 @@ def askforinput(msg='Do you want to proceed?', tab='', newline='\n'):
 
 
 def get_datatable(args, pop, chroms=None):
-    """
-    Load --input datatable.txt.
-    """
-
+    """Load --input datatable.txt."""
     print(ColorText(f"\nReading in SNP datatable for {pop}...").bold())
 
     # read in path
@@ -311,7 +297,6 @@ def get_datatable(args, pop, chroms=None):
 
 def wait_for_engines(engines, profile):
     """Reload engines until number matches input engines arg."""
-    
     lview = []
     dview = []
     count = 1
@@ -343,7 +328,6 @@ def wait_for_engines(engines, profile):
 
 def launch_engines(engines, profile):
     """Launch ipcluster with engines under profile."""
-
     print(ColorText(f"\nLaunching ipcluster with {engines} engines...").bold())
 
     def _launch(engines, profile):
@@ -375,7 +359,6 @@ def launch_engines(engines, profile):
 
 def attach_data(**kwargs) -> None:
     """Load object to engines."""
-
     import time
 
     num_engines = len(kwargs['dview'])
@@ -394,13 +377,11 @@ def attach_data(**kwargs) -> None:
 
 def uni(lst):
     """Return unqiue items from lst."""
-
     return list(set(lst))
 
 
 # def get_combos(pop, df, ploidy, dview):
 #     """Get unique combinations of minor_count (b), pop ploidy (n), and coverage (M)."""
-
 #     # get unique mincounts (b)  # TODO: don't worry about anthing less than args.mincount
 #     df[f'{pop}.minor_count'] = np.nan
 #     minors = df[f'{pop}.AD'] < df[f'{pop}.RD']
@@ -428,7 +409,6 @@ def uni(lst):
 
 # def pidiv_iterator(chunk, uni_b, uni_M, uni_n):
 #     """For each chunk (a unique combo of b, M, and n), calculate pidiv_buffer."""
-
 #     import varmath
 
 #     pi_buffer = {}
@@ -481,7 +461,6 @@ def uni(lst):
 
 def choose_pool(ploidy:dict, args, keep=None):
     """Choose which the pool to use as a key to the ploidy dict."""
-    
     keys = list(ploidy.keys())
     if len(keys) == 1:
         # return the value of the dict using the only key
@@ -511,7 +490,6 @@ def choose_pool(ploidy:dict, args, keep=None):
 
 def get_ploidy(args):
     """Get the ploidy of the populations of interest, reduce ploidy pkl."""
-
     # have user choose key to dict
     ploidy = choose_pool(pklload(args.ploidyfile), args)
 
@@ -531,11 +509,11 @@ def get_ploidy(args):
 
 
 def get_windows(chrom, **kwargs):
-    """Get info for all SNPs meeting criteria for a given window size on a specific chrom.
+    """
+    Get info for all SNPs meeting criteria for a given window size on a specific chrom.
 
     A window is centered on a SNP, and includes all SNPs within 0.5*windowsize to the left and right.
     """
-
     import pandas
 
     # set up args
@@ -588,7 +566,6 @@ def get_windows(chrom, **kwargs):
 
 def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsize):
     """Write window file to /tmp, combine later."""
-
     import os
     
     bname = os.path.basename(inputfile).replace(".txt", "")
@@ -611,7 +588,6 @@ def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsiz
 
 def send_windows(*args, **kwargs):
     """Send each window to varmath.VarianceExactCorrection."""
-
     import numpy, varmath as vm
 
     chroms = args[0]
@@ -697,7 +673,7 @@ def send_chrom_to_calculator(snps, lview, **kwargs):
 
 
 def check_pyversion():
-    """Make sure python is 3.6 <= version < 3.8"""
+    """Make sure python is 3.6 <= version < 3.8."""
     pyversion = float(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))
     if not pyversion >= 3.6:
         text = f'''FAIL: You are using python {pyversion}. This pipeline was built with python 3.7.
