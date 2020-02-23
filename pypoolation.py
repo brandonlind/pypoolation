@@ -1,17 +1,11 @@
-"""A python version of some scripts from popoolation.
+"""
+A python version of some scripts from popoolation.
 
-TODO: whichpops default
-TODO: auto stop ipcluster if __main__ dies
-TODO: split up main caller (pypoolation) with misc function
-TODO: ploidy pkl has first key of pool_name - how do I figure that out computationally? - ask the user for input
-TODO: remove ploidy key 'JP_pooled'
-TODO: do I assert pop arg is in ploidy[pool_chosen_by_user]?
-TODO: remove all "global [object]"
-
+TODO: if Tajima's D is selected, return pi and theta (and maybe ddivisor)
 """
 
-import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time, signal
-import itertools, pickle, numpy as np, math
+import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time
+import pickle
 from os import path as op
 from typing import Union
 
@@ -20,15 +14,17 @@ def read(file:str, lines=True) -> Union[str, list]:
     """Read contents of file."""
     with open(file, 'r') as o:
         text = o.read()
+
     if lines is True:
         ret = text.split("\n")
     else:
         ret = text
+
     return ret
 
 
 def pklload(path:str):
-    """Load object from a .pkl file"""
+    """Load object from a .pkl file."""
     pkl = pickle.load(open(path, 'rb'))
     return pkl
 
@@ -44,29 +40,25 @@ def get_client(profile='default') -> tuple:
     rc = ipyparallel.Client(profile=profile)
     dview = rc[:]
     lview = rc.load_balanced_view()
-    
-    return lview, dview
 
-def make_jobs(inputs:list, cmd, lview) -> list:
-    """Send each arg from inputs to a function command; async."""
-    print(f"making jobs for {cmd.__name__}")
-    jobs = []
-    for arg in tnb(inputs):
-        jobs.append(lview.apply_async(cmd, arg))
-    return jobs
+    return lview, dview
 
 
 def watch_async(jobs:list, phase=None) -> None:
     """Wait until jobs are done executing, show progress bar."""
     from tqdm import trange
+
     print(ColorText(f"\nWatching {len(jobs)} {phase} jobs ...").bold())
+    
+    job_idx = list(range(len(jobs)))
     for i in trange(len(jobs)):
         count = 0
         while count < (i+1):
-            count = 0
-            for j in jobs:
-                if j.ready():
+            count = len(jobs) - len(job_idx)
+            for j in job_idx:
+                if jobs[j].ready():
                     count += 1
+                    job_idx.remove(j)
 
 
 class ColorText():
@@ -116,8 +108,12 @@ class ColorText():
 
 
 def get_pars():
-    """Parse input flags."""
-    parser = argparse.ArgumentParser(description=mytext,
+    """
+    Parse input flags.
+
+    # TODO check arg descriptions, and if they're actually used.
+    """
+    parser = argparse.ArgumentParser(description=print(mytext),
                                      add_help=True,
                                      formatter_class=argparse.RawTextHelpFormatter)
     requiredNAMED = parser.add_argument_group('required arguments')
@@ -126,32 +122,42 @@ def get_pars():
                                default=None,
                                dest="input",
                                type=str,
-                               help="/path/to/VariantsToTable_output.txt")
+                               help='''/path/to/VariantsToTable_output.txt
+It is assumed that there is either a 'CHROM' or 'unstitched_chrom'
+column (ref.fa record name), and either a 'locus' or 'unstitched_locus' column.
+The 'locus' column elements are the hyphen-separated
+CHROM-POS. If the 'unstitched_chrom' column is present, the code will use the
+'unstitched_locus' column for SNP names, otherwise 'CHROM' and 'locus'. The
+'unstitched_locus' elements are therefore the hyphen-separated 
+unstitched_locus-unstitched_pos. DP, AD, and RD columns from VarScan are also 
+assumed.
+''')
     requiredNAMED.add_argument("-o","--outdir",
                                required=True,
                                default=None,
                                dest="outdir",
                                type=str,
-                               help="/path/to/pypoolation_output.txt")
+                               help="/path/to/pypoolation_output_dir/")
     requiredNAMED.add_argument("-m","--measure",
                                required=True,
                                default=None,
                                dest="measure",
                                type=str,
-                               help='''pi OR theta OR D. If D is selected, both pi and theta will
-also be output.''')
+                               help='''pi OR theta OR D.''')
     requiredNAMED.add_argument("-p","--ploidy",
                                required=True,
                                default=None,
                                dest="ploidyfile",
                                type=str,
-                               help="/path/to/the/ploidy.pkl file output by the VarScan pipeline.")
+                               help='''/path/to/the/ploidy.pkl file output by the VarScan pipeline. This is a python
+dictionary with key=pool_name, value=dict with key=pop, value=ploidy. The code
+will prompt for pool_name. pop(s) can be input with --whichpops.''')
     requiredNAMED.add_argument("-e","--engines",
                                required=True,
                                default=None,
                                dest="engines",
                                type=int,
-                               help="The number of multiprocessing engines that will be launched.")
+                               help="The number of ipcluster engines that will be launched.")
     parser.add_argument("--ipcluster-profile",
                         required=False,
                         default='default',
@@ -192,23 +198,17 @@ will not be considered. Default=1000''')
                         dest="mincovfraction",
                         type=float,
                         help='''The minimum fraction of a window having SNPs between min-coverage
-and max-coverage (fraction = num snps / windowsize). Default=0.0''')
+and max-coverage (fraction = num snps / windowsize). For the
+CoAdapTree data, this strategy was most computationally
+efficient. Data was further filtered after output.  Default=0.0''')
     parser.add_argument("--window-size",
                         required=False,
                         default=1000,
                         dest="windowsize",
                         type=str,
                         help='''The size of the sliding window. Windows are centered on
-individual SNPs, so 0.5*windowsize bps will be on either
-side of a SNP. Default=1000bp''')
-    parser.add_argument("--step-size",
-                        required=False,
-                        default=1000,
-                        dest="stepsize",
-                        type=int,
-                        help='''size of one sliding window step. If this number is equal
-to the --window-size the sliding window will be non 
-overlapping (jumping window). Default 1000bp''')
+individual SNPs, so any SNP within 0.5*windowsize bps
+from the current SNP will be included in the window. Default=1000bp''')
     parser.add_argument("--chromfile",
                         required=False,
                         default=None,
@@ -226,41 +226,46 @@ Default to analyze=All.''')
     # check flags
     args = parser.parse_args()
     if not op.exists(args.outdir):
-        print(ColorText(f"FAIL: the directory for the output file(s) does not exist.").bold().fail())
-        print(ColorText(f"FAIL: please create this directory: %s" % args.outdir).bold().fail())
-        print(ColorText("exiting pypoolation.py").bold().fail())  # TODO: check to make sure I'm consistent with .bold().fail()
+        print(ColorText(f"FAIL: the directory for the output file(s) does not exist.").fail())
+        print(ColorText(f"FAIL: please create this directory: %s" % args.outdir).fail())
+        print(ColorText("exiting pypoolation.py").fail())
         exit()
+
+    # make sure input and ploidyfile exist
     nopath = []
-    for x in [args.input, args.ploidyfile]:
+    for x in [args.input, args.ploidyfile]:  # TODO: check for $HOME or other bash vars in path
         if not op.exists(x):
             nopath.append(x)
+
+    # if input or ploidy file do not exist:
     if len(nopath) > 0:
         print(ColorText("FAIL: The following path%s do not exist:" % "s" if len(nopath) > 1 else "").fail())
-        [print(ColorText("FAIL: %s" % f).fail()) for f in nopath]
+        [print(ColorText("\nFAIL: %s" % f).fail()) for f in nopath]
     
     print('args = ', args)
+
     return args
 
 
 def askforinput(msg='Do you want to proceed?', tab='', newline='\n'):
-    "Ask for input; if msg is default and input is no, exit."
+    """Ask for input; if msg is default and input is no, exit."""
     while True:
         inp = input(ColorText(f"{newline}{tab}INPUT NEEDED: {msg} \n{tab}(yes | no): ").warn().__str__()).lower()
         if inp in ['yes', 'no']:
             if inp == 'no' and msg=='Do you want to proceed?':
-                print(ColorText('exiting %s' % sys.argv[0]).bold().fail())
+                print(ColorText('exiting %s' % sys.argv[0]).fail())
                 exit()
             break
         else:
-            print(ColorText("Please respond with 'yes' or 'no'").fail().bold())
+            print(ColorText("Please respond with 'yes' or 'no'").fail())
+
     return inp
 
 
-def get_datatable(args, pop, chroms=None):
-    """
-    Load --input datatable.txt.
-    """
+def get_datatable(args, pop, chroms=None) -> pd.DataTable:
+    """Load --input datatable.txt."""
     print(ColorText(f"\nReading in SNP datatable for {pop}...").bold())
+
     # read in path
     df = pd.read_table(args.input)
 
@@ -269,14 +274,14 @@ def get_datatable(args, pop, chroms=None):
         if op.exists(args.chromfile):
             chroms = read(args.chromfile)
         else:
-            print(ColorText(f"\nFAIL: chromsome file does not exist: {args.chromfile}").bold().fail())
-            print(ColorText("exiting pypoolation.py").bold().fail())
+            print(ColorText(f"\nFAIL: chromsome file does not exist: {args.chromfile}").fail())
+            print(ColorText("exiting pypoolation.py").fail())
             exit()
 
     # determine which column to use for parallelization
     chromcol = 'unstitched_chrom' if 'unstitched_chrom' in df.columns else 'CHROM'
     if chromcol not in df.columns:
-        print(ColorText(f"FAIL: {chromcol} is not in the input columns").bold().fail())
+        print(ColorText(f"FAIL: {chromcol} is not in the input columns").fail())
         print(ColorText("exiting pypoolation.py").fail.bold())
         exit()
     print(f'\tUsing the {chromcol} column to parallelize data')
@@ -284,11 +289,11 @@ def get_datatable(args, pop, chroms=None):
     # reduce df to pop that matters
     keepcols = [col for col in df.columns if '.' not in col or pop in col]
     df = df[keepcols].copy()
-    
+
     # reduce rows
-    df = df[df[f'{pop}.FREQ']==df[f'{pop}.FREQ']].copy()  # only keep filtered SNPs (filtered across all pops)
+    df = df[df[f'{pop}.FREQ']==df[f'{pop}.FREQ']].copy()  # only keep filtered SNPs (filtered SNPs don't have a FREQ)
     df = df[df[f'{pop}.FREQ']!= '0%'].copy()  # remove SNPs that are invariable in the current pop
-    
+
     # set index to chromcol for db-like lookups
     df.index = df[chromcol].tolist()
 
@@ -307,46 +312,52 @@ def get_datatable(args, pop, chroms=None):
 def wait_for_engines(engines, profile):
     """Reload engines until number matches input engines arg."""
     lview = []
-    count = 0
-    while len(lview) != engines:
-        if count % 20 == 0:
+    dview = []
+    count = 1
+    while any([len(lview) != engines, len(dview) != engines]):
+        if count % 30 == 0:
             # if waiting too long..
-            print(ColorText("\tFAIL: waited too long for engines. Exiting pypoolation.").fail())
+            # TODO: if found engines = 0, no reason to ask, if they continue it will fail
+            print('count = ', count)
+            print(ColorText("\tFAIL: Waited too long for engines.").fail())
             print(ColorText("\tFAIL: Make sure that if any cluster is running, the -e arg matches the number of engines.").fail())
             print(ColorText("\tFAIL: In some cases, not all expected engines can start on a busy server.").fail())
+            print(ColorText("\tFAIL: Therefore, it may be the case that available engines will be less than requested.").fail())
             print(ColorText("\tFAIL: pypoolation found %s engines, with -e set to %s" % (len(lview), engines)).fail())
-            answer = askforinput(msg='Would you like to continue with %s engines? (choosing no will wait another 30 seconds)' % len(lview), tab='\t', newline='')
+            answer = askforinput(msg='Would you like to continue with %s engines? (choosing no will wait another 60 seconds)' % len(lview), tab='\t', newline='')
             if answer == 'yes':
                 break
         try:
             lview,dview = get_client(profile=profile)
-        except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError) as e:
+        except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError):
             lview = []
-            pass
+            dview = []
         time.sleep(2)
         count += 1
+
+    print('\tReturning lview,dview (%s engines) ...' % len(lview))
+
     return lview,dview
 
 
 def launch_engines(engines, profile):
     """Launch ipcluster with engines under profile."""
     print(ColorText(f"\nLaunching ipcluster with {engines} engines...").bold())
-    
+
     def _launch(engines, profile):
         subprocess.call([shutil.which('ipcluster'), 'start', '-n', str(engines), '--daemonize'])
-    
+
     # first see if a cluster has already been started
     started = False
     try:
-        print("\tLooking for exising engines ...")
+        print("\tLooking for existing engines ...")
         lview,dview = get_client(profile=profile)
         if len(lview) != engines:
             lview,dview = wait_for_engines(engines, profile)
         started = True
-    except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError) as e:
+    except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError):
         print("\tNo engines found ...")
-        pass
-    
+
     # if not, launch 'em
     if started is False:
         print("\tLaunching engines ...")
@@ -355,121 +366,169 @@ def launch_engines(engines, profile):
         x.daemon=True
         x.start()
         lview,dview = wait_for_engines(engines, profile)
+
     return lview,dview
 
 
 def attach_data(**kwargs) -> None:
     """Load object to engines."""
+    import time
+
+    num_engines = len(kwargs['dview'])
     print(ColorText("\nAdding data to engines ...").bold())
     print(ColorText("\tWARN: Watch available mem in another terminal window: 'watch free -h'").warn())
     print(ColorText("\tWARN: If available mem gets too low, kill engines and restart pypoolation with fewer engines: 'ipcluster stop'").warn())
     for key,value in kwargs.items():
         if key != 'dview':
-            print(f'\tLoading {key} ({value.__class__.__name__}) to engines')
+            print(f'\tLoading {key} ({value.__class__.__name__}) to {num_engines} engines')
             kwargs['dview'][key] = value
-    return None
-        
+            time.sleep(1)
+    time.sleep(10)
 
-def uni(lst):
+    return None
+
+
+def uni(lst) -> list:
     """Return unqiue items from lst."""
     return list(set(lst))
 
-def get_combos(pop, df, ploidy, dview):
-    """Get unique combinations of minor_count (b), pop ploidy (n), and coverage (M)."""
-    # get unique mincounts (b)  # TODO: don't worry about anthing less than args.mincount
-    df[f'{pop}.minor_count'] = np.nan
-    minors = df[f'{pop}.AD'] < df[f'{pop}.RD']
-    df.loc[minors, f'{pop}.minor_count'] = df.loc[minors, f'{pop}.AD']
-    df.loc[~minors, f'{pop}.minor_count'] = df.loc[~minors, f'{pop}.RD']
-    uni_b = uni([x for x in df[f'{pop}.minor_count'].astype(int) if x==x and x!=0])
-    print('uni_b = ', uni_b)
 
-    # get unique poolsizes (from ploidy)
-    uni_n = uni(ploidy.values())
+# def get_combos(pop, df, ploidy, dview):
+#     """Get unique combinations of minor_count (b), pop ploidy (n), and coverage (M)."""
+#     # get unique mincounts (b)  # TODO: don't worry about anthing less than args.mincount
+#     df[f'{pop}.minor_count'] = np.nan
+#     minors = df[f'{pop}.AD'] < df[f'{pop}.RD']
+#     df.loc[minors, f'{pop}.minor_count'] = df.loc[minors, f'{pop}.AD']
+#     df.loc[~minors, f'{pop}.minor_count'] = df.loc[~minors, f'{pop}.RD']
+#     uni_b = uni([x for x in df[f'{pop}.minor_count'].astype(int) if x==x and x!=0])
+#     print('uni_b = ', uni_b)
 
-    # get unique coverages
-    uni_M = uni([x for x in df[f'{pop}.DP'].astype(int) if x==x])
+#     # get unique poolsizes (from ploidy)
+#     uni_n = uni(ploidy.values())
 
-    # get unique combinations
-    uni_combos = list(itertools.product(range(len(uni_b)),
-                                        range(len(uni_M)),
-                                        range(len(uni_n))))
+#     # get unique coverages
+#     uni_M = uni([x for x in df[f'{pop}.DP'].astype(int) if x==x])
+
+#     # get unique combinations
+#     uni_combos = list(itertools.product(range(len(uni_b)),
+#                                         range(len(uni_M)),
+#                                         range(len(uni_n))))
+
+#     # attache data to engines
+#     attach_data(uni_b=uni_b, uni_M=uni_M, uni_n=uni_n, dview=dview)
+
+#     return uni_combos, uni_b, uni_M, uni_n
+
+
+# def pidiv_iterator(chunk, uni_b, uni_M, uni_n):
+#     """For each chunk (a unique combo of b, M, and n), calculate pidiv_buffer."""
+#     import varmath
+
+#     pi_buffer = {}
+#     for b_idx, M_idx, n_idx in chunk:
+#         b = int(uni_b[int(b_idx)])
+#         M = int(uni_M[int(M_idx)])
+#         n = int(uni_n[int(n_idx)])
+#         key = f"{b}-{n}-{M}"
+#         div, buffdict = varmath.get_pidiv_buffer(b, n, M)
+#         pi_buffer[key] = div
+
+#     return pi_buffer
+
+
+# def send_get_pidiv_buffer(**kwargs):
+#     """Parallelize varmath.get_pidiv_buffer()."""
+#     import math
+
+#     # get unique combos of b, n, and M
+#     uni_combos, uni_b, uni_M, uni_n = get_combos(kwargs['pop'], kwargs['snps'], kwargs['ploidy'], kwargs['dview'])
+#     for name,lst in zip(['uni_combos', 'uni_b', 'uni_M', 'uni_n'],[uni_combos, uni_b, uni_M, uni_n]):
+#         print(name, len(lst))
+#     print(uni_combos[:5])
     
-    # attache data to engines
-    attach_data(uni_b=uni_b, uni_M=uni_M, uni_n=uni_n, dview=dview)
-    
-    return uni_combos, uni_b, uni_M, uni_n
+#     # send out jobs
+#     maxjobs = math.ceil(len(uni_combos)/kwargs['engines'])
+#     print('maxjobs = ', maxjobs)
+#     jobs = []
+#     chunk = []
+#     for i,combo in enumerate(uni_combos):
+#         chunk.append(combo)
+#         if len(chunk) == maxjobs or (i+1) == len(uni_combos):
+#             jobs.append(kwargs['lview'].apply_async(pidiv_iterator, *(chunk, uni_b, uni_M, uni_n)))
+# #             jobs.append(pidiv_iterator(chunk, uni_b, uni_M, uni_n))
+#             chunk = []
+
+#     # wait for jobs to finish
+#     watch_async(jobs, 'pidiv_iterator')
+
+#     # get returns
+#     buffdict = {}
+#     for j in jobs:
+#         print('len(j.r) = ', len(j.r))
+#         print('type(j.r) = ', type(j.r))
+#         buffdict.update(j.r)
+#     print('buffdict = ', list(buffdict.keys())[:5])
+
+#     return buffdict
 
 
-def pidiv_iterator(chunk, uni_b, uni_M, uni_n):
-    """For each chunk (a unique combo of b, M, and n), calculate pidiv_buffer."""
-    import varmath
-    
-    pi_buffer = {}
-    for b_idx, M_idx, n_idx in chunk:
-        b = int(uni_b[int(b_idx)])
-        M = int(uni_M[int(M_idx)])
-        n = int(uni_n[int(n_idx)])
-        key = f"{b}-{n}-{M}"
-        div, buffdict = varmath.get_pidiv_buffer(b, n, M)
-        pi_buffer[key] = div
-    return pi_buffer
+def choose_pool(ploidy:dict, args, keep=None) -> dict:
+    """Choose which the pool to use as a key to the ploidy dict."""
+    keys = list(ploidy.keys())
+    if len(keys) == 1:
+        # return the value of the dict using the only key
+        return ploidy[keys[0]]
+
+    print(ColorText('\nPlease choose a pool that contains the population of interest.').bold())
+    nums = []
+    for i,pool in enumerate(keys):
+        print('\t%s %s' % (i, pool))
+        nums.append(i)
+
+    while True:
+        inp = int(input(ColorText("\tINPUT NEEDED: Choose file by number: ").warn()).lower())
+        if inp in nums:
+            pool = keys[inp]
+            break
+        else:
+            print(ColorText("\tPlease respond with a number from above.").fail())
+
+    # make sure they've chosen at least one account
+    while pool is None:
+        print(ColorText("\tFAIL: You need to specify at least one pool. Revisiting options...").fail())
+        pool = choose_pool(ploidy, args, keep=None)
+
+    return ploidy[pool]
 
 
-def send_get_pidiv_buffer(**kwargs):
-    """Parallelize varmath.get_pidiv_buffer()."""
-    
-    # get unique combos of b, n, and M
-    uni_combos, uni_b, uni_M, uni_n = get_combos(kwargs['pop'], kwargs['snps'], kwargs['ploidy'], kwargs['dview'])
-    for name,lst in zip(['uni_combos', 'uni_b', 'uni_M', 'uni_n'],[uni_combos, uni_b, uni_M, uni_n]):
-        print(name, len(lst))
-    print(uni_combos[:5])
-    
-    # send out jobs
-    maxjobs = math.ceil(len(uni_combos)/kwargs['engines'])
-    print('maxjobs = ', maxjobs)
-    jobs = []
-    chunk = []
-    for i,combo in enumerate(uni_combos):
-        chunk.append(combo)
-        if len(chunk) == maxjobs or (i+1) == len(uni_combos):
-            jobs.append(kwargs['lview'].apply_async(pidiv_iterator, *(chunk, uni_b, uni_M, uni_n)))
-#             jobs.append(pidiv_iterator(chunk, uni_b, uni_M, uni_n))
-            chunk = []
-
-    # wait for jobs to finish
-    watch_async(jobs, 'pidiv_iterator')
-    
-    # get returns
-    buffdict = {}
-    for j in jobs:
-        print('len(j.r) = ', len(j.r))
-        print('type(j.r) = ', type(j.r))
-        buffdict.update(j.r)
-    print('buffdict = ', list(buffdict.keys())[:5])
-
-    return buffdict
-    
-
-
-def get_ploidy(ploidyfile, pops):
+def get_ploidy(args) -> dict:
     """Get the ploidy of the populations of interest, reduce ploidy pkl."""
-    global ploidy
-    ploidy = pklload(ploidyfile)['JP_pooled']  # TODO: remove this
-     
+    # have user choose key to dict
+    ploidy = choose_pool(pklload(args.ploidyfile), args)
+
+    # keep only the pops from --which-pops flag
     for pop in list(ploidy.keys()):
-        if not pop in pops:
+        if not pop in args.whichpops:
             ploidy.pop(pop)
+
+    # make sure outcome makes sense
+    if not len(ploidy.keys()) == len(args.whichpops):
+        print(ColorText("FAIL: The populations that were provided were not all found in ploidy.pkl").fail())
+        print(ColorText("FAIL: Here are the populations that were provided that were not found:").fail())
+        for pop in set(args.whichpops) - set(ploidy.keys()):
+            print(ColorText(f"\t{pop}").fail())
+
     return ploidy
 
 
-def get_windows(chrom, **kwargs):
-    """Get info for all SNPs meeting criteria for a given window size on a specific chrom.
-    
+def get_windows(chrom, **kwargs) -> dict:
+    """
+    Get info for all SNPs meeting criteria for a given window size on a specific chrom.
+
     A window is centered on a SNP, and includes all SNPs within 0.5*windowsize to the left and right.
     """
     import pandas
-    
+
     # set up args
     args = kwargs['args']
     mincov = args.mincov
@@ -477,9 +536,9 @@ def get_windows(chrom, **kwargs):
     windowsize = args.maxcov
     mincount = args.mincount
     pop = kwargs['pop']
-    
+
     # set up df
-    df = snps.loc[chrom,:].copy()
+    df = kwargs['snps'].loc[chrom,:].copy()
     if isinstance(df, pandas.core.series.Series):
         # if chrom has only one row
         df = pandas.DataFrame(df).T
@@ -493,14 +552,14 @@ def get_windows(chrom, **kwargs):
         windows[locus] = {'measure': args.measure,
                           'snps': {}
                          }
-        
+
         # find all SNPs within window
         chrom,pos = locus.split('-')
         rows = abs(df[poscol]-int(pos)) <= 0.5*windowsize
-        
+
         # get info for all SNPs within window
         for snp in df.loc[rows, locuscol]:
-            # if snp passes mincount (min count of the minor allele), min/maxcov flags 
+            # if snp passes mincount (min count of the minor allele), min/maxcov flags
             # (first part checks AD and RD so I don't have to determine minor allele)
             if all([df[f'{pop}.RD'][snp] >= mincount, df[f'{pop}.AD'][snp] >= mincount,
                     df[f'{pop}.DP'][snp] >= mincov, df[f'{pop}.DP'][snp] <= maxcov]):
@@ -518,108 +577,146 @@ def get_windows(chrom, **kwargs):
     return windows
 
 
-def write_tmp_file(measures, chrom, pop, statistic):
-    """Write window file to /tmp, combine later.
+def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsize) -> str:
+    """Write window file to /tmp, combine later."""
+    import os
     
-    # TODO: include flag values in outfile name
-    """
-    import tempfile, os
+    bname = os.path.basename(inputfile).replace(".txt", "")
 
-    file = os.path.join(tempfile.gettempdir(), f"{chrom}_{statistic}_{pop}.txt")
+    tmpdir = os.path.join(outdir, 'tmp')
+    if not os.path.exists(tmpdir):
+        os.makedirs(tmpdir)
+
+    file = os.path.join(tmpdir, f"{bname}_{pop}_{statistic}_{windowsize}bp-windows_{chrom}.txt")
     with open(file, 'w') as o:
-        o.write(f"chrom\tlocus\tsnpcount\tcoveredFraction\tstatistitc ({statistic})\n")
+        o.write(f"chrom\tlocus\tsnpcount\tcoveredFraction\tstatistic ({statistic})\n")
         lines = []
-        print ("chrom = ", chrom)
         for locus,dic in measures.items():
             lines.append('\t'.join([chrom, locus, str(dic['covercount']),
                                     str(dic['covfraction']), str(dic[statistic])] ))
         o.write("\n".join(lines))
-        
+
     return file
 
 
-def send_windows(*args, **kwargs):
-    """
-    Send each window to varmath.VarianceExactCorrection.
-    
-    # TODO : make sure this will work for other measures other than D
-    """
+def send_windows(*args, **kwargs) -> list:
+    """Send each window to varmath.VarianceExactCorrection."""
     import numpy, varmath as vm
-    chrom = args[0]
-    
-    # gather kwargs
+
+    chroms = args[0]
+
+    # gather args, kwargs
     args = kwargs['args']
-    print('lucky args = ', args)
     vm_kwargs = {'mincov':args.mincov,
                  'maxcov':args.maxcov,
-                 'poolsize':ploidy[kwargs['pop']],
+                 'poolsize':kwargs['ploidy'][kwargs['pop']],
                  'mincount':args.mincount,
-                 'pidiv_buffer':kwargs['pidiv_buffer'],  # TODO: it's already in globals, can I just use that instead of passing?
+                 'pidiv_buffer':kwargs['pidiv_buffer'],  # TODO: not needed after deprecating send_get_pidiv_buffer()
                 }
 
     # do the popgen
-    measures = {}  # TODO: I don't need to return a dict, I just need to write to a file.
-    for locus,window in get_windows(chrom, **kwargs).items():
-        # filter by covercount
-        measures[locus] = {}
-        if (len(window) / args.windowsize) < args.mincovfraction:
-            # if the fraction of the window occupied by SNPs passing filtered is not high enough
-            measures[locus][args.measure] = numpy.nan
-        else:
-            print('window keys = ', window.keys())
-            print('window["snps"].keys() = ', window["snps"].keys())
-            measures[locus][args.measure] = vm.VarianceExactCorrection(**vm_kwargs).calculate_measure(**window)
-        measures[locus]['covercount'] = window['covercount']  # number of snps passing filters in window
-        measures[locus]['covfraction'] = window['covercount'] / args.windowsize
-    
-    # write the file
-    file = write_tmp_file(measures, chrom, kwargs['pop'], args.measure)
-            
-    return file
+    files = []
+    for chrom in chroms:
+        measures = {}
+        for locus,window in get_windows(chrom, **kwargs).items():
+            # filter by covercount
+            measures[locus] = {}
+            covfraction = (len(window['snps']) / args.windowsize)
+            if covfraction < args.mincovfraction or len(window['snps'])==0:
+                # if the fraction of the window occupied by SNPs passing filtered is not high enough
+                measures[locus][args.measure] = numpy.nan
+            else:
+                measures[locus][args.measure] = vm.VarianceExactCorrection(**vm_kwargs).calculate_measure(**window)
+            measures[locus]['covercount'] = window['covercount']  # number of snps passing filters in window
+            measures[locus]['covfraction'] = window['covercount'] / args.windowsize
+
+        # write the file
+        file = write_tmp_file(measures, chrom, kwargs['pop'], args.measure, args.outdir, args.input, args.windowsize)
+        files.append(file)
+
+    return files
 
 
-def send_chrom_to_calculator(snps, lview, **kwargs):
+def send_chrom_to_calculator(lview, **kwargs) -> str:
     """
     Parallelize varmath.VarianceExactCorrection by individual chroms.
-    
+
     # TODO: make option to parallelize across windows instead of chroms (assuming chroms >> windows)
     """
+    import tqdm, math
+
+    # determine how to divy up jobs
+    chroms = uni(kwargs['snps'][kwargs['chromcol']])
+    jobsize = math.ceil(len(chroms)/1000)
+
+    # send jobs to engines
+    numjobs = (len(chroms)/jobsize)+1
+    print(ColorText("\nSending %d jobs to engines ..." % numjobs ).bold())
     jobs = []
-    for chrom in uni(snps[kwargs['chromcol']]):
-        jobs.append(lview.apply_async(send_windows, *[chrom], **kwargs))
-#         jobs.append(send_windows(*[chrom], **kwargs))
+    chroms_to_send = []
+    count = 0
+    for chrom in tqdm.tqdm(chroms):
+        count += 1
+        chroms_to_send.append(chrom)
+        if len(chroms_to_send) == jobsize or count == len(chroms):
+            jobs.append(lview.apply_async(send_windows, *[chroms_to_send], **kwargs))
+#             jobs.append(send_windows(*[chroms_to_send], **kwargs))  # for debugging
+            chroms_to_send = []
+#     measure_df = pd.concat([pd.read_table(f) for j in jobs for f in j])  # for debugging
 
     # wait until jobs finish
     watch_async(jobs, phase='send_windows')
-    
+
     # get tmp file names, read in, concatenate into one df
-    measure_df = pd.concat([pd.read_table(j.r) for j in jobs])
-    
+    measure_df = pd.concat([pd.read_table(f) for j in jobs for f in j.r])
+
     # write real file
-    # TODO: incorporate pool name once user defines for ploidy.pkl
     args = kwargs['args']
     pop = kwargs['pop']
-    file = op.join(args.outdir, f"{args.measure}_{pop}.txt")
+    bname = os.path.basename(args.input).replace(".txt", "")
+    # save statistics file
+    file = op.join(args.outdir, f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}.txt")
     measure_df.to_csv(file, sep='\t', index=False)
+    # save input arguments
+    pkldump(args, os.path.join(args.outdir,
+                               f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}_ARGS.pkl"))
     # TODO: delete tmp files?
-    return file
-    
 
-def main():
-    # TODO: check that current dir is in the pythonpath so no import errors
-#     check_pythonpath()
+    return file
+
+
+def check_pyversion() -> None:
+    """Make sure python is 3.6 <= version < 3.8."""
+    pyversion = float(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))
+    if not pyversion >= 3.6:
+        text = f'''FAIL: You are using python {pyversion}. This pipeline was built with python 3.7.
+FAIL: use  3.6 <= python version < 3.8
+FAIL: exiting pypoolation.py'''
+        print(ColorText(text).fail())
+        exit()
+    if not pyversion < 3.8:
+        print(ColorText("FAIL: python 3.8 has issues with the ipyparallel engine returns.").fail())
+        print(ColorText("FAIL: use  3.6 <= python version < 3.8").fail())
+        print(ColorText("FAIL: exiting pypoolation.py").fail())
+        exit()
+
+
+def main(pidiv_buffer:dict={}):
+    # make sure it's not python3.8
+    check_pyversion()
 
     # get args
     args = get_pars()
-    
+
     # get ploidy dict
-    ploidy = get_ploidy(args.ploidyfile, args.whichpops)
-    
-    
+#     global ploidy  # for debugging send_windows()
+    ploidy = get_ploidy(args)
+
+
     # iterate through pops
     for pop in ploidy:
         # read in VariantsToTable.txt file, filter chroms based on args
-        global snps
+#         global snps  # for debugging send_windows()
         snps, chromcol = get_datatable(args, pop)
 
         # get ipcluster engines
@@ -628,34 +725,31 @@ def main():
         # attach data on all engines
         attach_data(snps=snps, ploidy=ploidy, dview=dview)
 
-        # get pidiv_buffer, attach data to all engines
+        # get pidiv_buffer, attach data to all engines  # A nice idea, but takes too long
 #         global pidiv_buffer
-        pidiv_buffer = send_get_pidiv_buffer(snps=snps, lview=lview, chromcol=chromcol,
-                                             ploidy=ploidy, pop=pop, engines=args.engines,
-                                             dview=dview)
-        print('\tlen(pidiv_buffer) = ', len(pidiv_buffer))
-        
+#         pidiv_buffer = send_get_pidiv_buffer(snps=snps, lview=lview, chromcol=chromcol,
+#                                              ploidy=ploidy, pop=pop, engines=args.engines,
+#                                              dview=dview)
+#         print('\tlen(pidiv_buffer) = ', len(pidiv_buffer))
+
         # attach functions and dict to engines (used in and downstream of send_to_calculate())
         attach_data(write_tmp_file=write_tmp_file,
                     send_windows=send_windows,
                     send_chrom_to_calculator=send_chrom_to_calculator,
                     get_windows=get_windows,
-                    pidiv_buffer=pidiv_buffer,
+#                     pidiv_buffer=pidiv_buffer,
                     dview=dview)
 
         # calculate measure
-        file = send_chrom_to_calculator(snps, lview,
-                                        chromcol=chromcol, args=args, pop=pop,
-                                        pidiv_buffer=pidiv_buffer)
-        print(ColorText("\nWrote stats to %s" % file).bold())
+        file = send_chrom_to_calculator(lview, snps=snps, chromcol=chromcol, args=args, pop=pop,
+                                        pidiv_buffer=pidiv_buffer, ploidy=ploidy)
+        print(ColorText("\nWrote stats to ").green().__str__() + ColorText(file).bold().green().__str__())
+        print(ColorText("\nWrote pypoolation arguments used to ").green().__str__() +
+              ColorText(file.replace(".txt", "_ARGS.pkl")).green().bold().__str__())
 
         # kill ipcluster to avoid mem problems (restart next loop)
         print(ColorText("\n\tStopping ipcluster ...").bold())
         subprocess.call([shutil.which('ipcluster'), 'stop'])
-
-    
-
-    
 
 
 if __name__ == '__main__':
@@ -668,10 +762,10 @@ if __name__ == '__main__':
        |  __/  _   _ |  __/ /  \\  /  \\ | | /  V| | | | | /  \\ | V  |
        | |    \\ \\/ / | |   | O  || O  || |  C  | | | | || O  || || |
        |_|     \\  /  |_|    \\__/  \\__/ |_| \\_/_| |_| |_| \\__/ |_||_|
-               / /              . . 
-              /_/            \\        /
-                              \\______/
-                                  U
+               / /             . . 
+              /_/           \\        /
+                             \\______/
+                                 U
                 
                 Tajima's Pi, Watterson's Theta, Tajima's D
 *****************************************************************************''').green().bold().__str__()
