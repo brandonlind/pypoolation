@@ -1,9 +1,6 @@
 """Functions to calculate pi, theata, D."""
 
 
-import numpy
-
-
 def get_nbase_buffer(poolsize:int) -> float:
     """
     poolsize - The haploid number of the pool which has been sequenced.
@@ -433,7 +430,7 @@ class VarianceExactCorrection:
     mincount (->b) - The minimum count of the minor allele for a SNP to be considered.
     pidiv_buffer - dict with key b:n:M permutations, for fast and easy lookup ...
         of value from get_pidiv_buffer()
-    
+
     Returns
     VarianceExactCorrection class object
     """

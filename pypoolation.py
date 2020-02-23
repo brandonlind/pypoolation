@@ -357,7 +357,6 @@ def launch_engines(engines, profile):
         started = True
     except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError):
         print("\tNo engines found ...")
-        pass
 
     # if not, launch 'em
     if started is False:
@@ -583,7 +582,7 @@ def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsiz
     import os
     
     bname = os.path.basename(inputfile).replace(".txt", "")
-    
+
     tmpdir = os.path.join(outdir, 'tmp')
     if not os.path.exists(tmpdir):
         os.makedirs(tmpdir)
@@ -745,7 +744,7 @@ def main(pidiv_buffer:dict={}):
         file = send_chrom_to_calculator(lview, snps=snps, chromcol=chromcol, args=args, pop=pop,
                                         pidiv_buffer=pidiv_buffer, ploidy=ploidy)
         print(ColorText("\nWrote stats to ").green().__str__() + ColorText(file).bold().green().__str__())
-        print(ColorText("\nWrote pypoolation arguments used to ").green().__str__() + 
+        print(ColorText("\nWrote pypoolation arguments used to ").green().__str__() +
               ColorText(file.replace(".txt", "_ARGS.pkl")).green().bold().__str__())
 
         # kill ipcluster to avoid mem problems (restart next loop)
