@@ -1,18 +1,17 @@
-"""A python version of some scripts from popoolation.
+"""
+A python version of some scripts from popoolation.
 
 TODO: if Tajima's D is selected, return pi and theta (and maybe ddivisor)
-
 """
 
-import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time, signal
-import pickle, numpy as np
+import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time
+import pickle
 from os import path as op
 from typing import Union
 
 
 def read(file:str, lines=True) -> Union[str, list]:
     """Read contents of file."""
-
     with open(file, 'r') as o:
         text = o.read()
 
@@ -25,7 +24,7 @@ def read(file:str, lines=True) -> Union[str, list]:
 
 
 def pklload(path:str):
-    """Load object from a .pkl file"""
+    """Load object from a .pkl file."""
     pkl = pickle.load(open(path, 'rb'))
     return pkl
 
@@ -109,8 +108,11 @@ class ColorText():
 
 
 def get_pars():
-    """Parse input flags.
-    # TODO check arg descriptions, and if they're actually used."""
+    """
+    Parse input flags.
+
+    # TODO check arg descriptions, and if they're actually used.
+    """
     parser = argparse.ArgumentParser(description=print(mytext),
                                      add_help=True,
                                      formatter_class=argparse.RawTextHelpFormatter)
@@ -120,7 +122,16 @@ def get_pars():
                                default=None,
                                dest="input",
                                type=str,
-                               help="/path/to/VariantsToTable_output.txt")
+                               help='''/path/to/VariantsToTable_output.txt
+It is assumed that there is either a 'CHROM' or 'unstitched_chrom'
+column (ref.fa record name), and either a 'locus' or 'unstitched_locus' column.
+The 'locus' column elements are the hyphen-separated
+CHROM-POS. If the 'unstitched_chrom' column is present, the code will use the
+'unstitched_locus' column for SNP names, otherwise 'CHROM' and 'locus'. The
+'unstitched_locus' elements are therefore the hyphen-separated 
+unstitched_locus-unstitched_pos. DP, AD, and RD columns from VarScan are also 
+assumed.
+''')
     requiredNAMED.add_argument("-o","--outdir",
                                required=True,
                                default=None,
@@ -132,20 +143,21 @@ def get_pars():
                                default=None,
                                dest="measure",
                                type=str,
-                               help='''pi OR theta OR D. If D is selected, both pi and theta will
-also be output.''')
+                               help='''pi OR theta OR D.''')
     requiredNAMED.add_argument("-p","--ploidy",
                                required=True,
                                default=None,
                                dest="ploidyfile",
                                type=str,
-                               help="/path/to/the/ploidy.pkl file output by the VarScan pipeline.")
+                               help='''/path/to/the/ploidy.pkl file output by the VarScan pipeline. This is a python
+dictionary with key=pool_name, value=dict with key=pop, value=ploidy. The code
+will prompt for pool_name. pop(s) can be input with --whichpops.''')
     requiredNAMED.add_argument("-e","--engines",
                                required=True,
                                default=None,
                                dest="engines",
                                type=int,
-                               help="The number of multiprocessing engines that will be launched.")
+                               help="The number of ipcluster engines that will be launched.")
     parser.add_argument("--ipcluster-profile",
                         required=False,
                         default='default',
@@ -186,7 +198,9 @@ will not be considered. Default=1000''')
                         dest="mincovfraction",
                         type=float,
                         help='''The minimum fraction of a window having SNPs between min-coverage
-and max-coverage (fraction = num snps / windowsize). Default=0.0''')
+and max-coverage (fraction = num snps / windowsize). For the
+CoAdapTree data, this strategy was most computationally
+efficient. Data was further filtered after output.  Default=0.0''')
     parser.add_argument("--window-size",
                         required=False,
                         default=1000,
@@ -315,7 +329,7 @@ def wait_for_engines(engines, profile):
                 break
         try:
             lview,dview = get_client(profile=profile)
-        except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError) as e:
+        except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError):
             lview = []
             dview = []
         time.sleep(2)
@@ -525,7 +539,7 @@ def get_windows(chrom, **kwargs):
     pop = kwargs['pop']
 
     # set up df
-    df = snps.loc[chrom,:].copy()
+    df = kwargs['snps'].loc[chrom,:].copy()
     if isinstance(df, pandas.core.series.Series):
         # if chrom has only one row
         df = pandas.DataFrame(df).T
@@ -596,9 +610,9 @@ def send_windows(*args, **kwargs):
     args = kwargs['args']
     vm_kwargs = {'mincov':args.mincov,
                  'maxcov':args.maxcov,
-                 'poolsize':ploidy[kwargs['pop']],
+                 'poolsize':kwargs['ploidy'][kwargs['pop']],
                  'mincount':args.mincount,
-                 'pidiv_buffer':kwargs['pidiv_buffer'],  # TODO: it's already in globals, can I just use that instead of passing?
+                 'pidiv_buffer':kwargs['pidiv_buffer'],  # TODO: not needed after deprecating send_get_pidiv_buffer()
                 }
 
     # do the popgen
@@ -624,7 +638,7 @@ def send_windows(*args, **kwargs):
     return files
 
 
-def send_chrom_to_calculator(snps, lview, **kwargs):
+def send_chrom_to_calculator(lview, **kwargs):
     """
     Parallelize varmath.VarianceExactCorrection by individual chroms.
 
@@ -633,7 +647,7 @@ def send_chrom_to_calculator(snps, lview, **kwargs):
     import tqdm, math
 
     # determine how to divy up jobs
-    chroms = uni(snps[kwargs['chromcol']])
+    chroms = uni(kwargs['snps'][kwargs['chromcol']])
     jobsize = math.ceil(len(chroms)/1000)
 
     # send jobs to engines
@@ -728,10 +742,11 @@ def main(pidiv_buffer:dict={}):
                     dview=dview)
 
         # calculate measure
-        file = send_chrom_to_calculator(snps, lview,
-                                        chromcol=chromcol, args=args, pop=pop,
-                                        pidiv_buffer=pidiv_buffer)
-        print(ColorText("\nWrote stats to %s" % file).bold().green())
+        file = send_chrom_to_calculator(lview, snps=snps, chromcol=chromcol, args=args, pop=pop,
+                                        pidiv_buffer=pidiv_buffer, ploidy=ploidy)
+        print(ColorText("\nWrote stats to ").green().__str__() + ColorText(file).bold().green().__str__())
+        print(ColorText("\nWrote pypoolation arguments used to ").green().__str__() + 
+              ColorText(file.replace(".txt", "_ARGS.pkl")).green().bold().__str__())
 
         # kill ipcluster to avoid mem problems (restart next loop)
         print(ColorText("\n\tStopping ipcluster ...").bold())

@@ -8,7 +8,7 @@ def get_nbase_buffer(poolsize:int) -> float:
     """
     poolsize - The haploid number of the pool which has been sequenced.
 
-    Returns:
+    Returns
     nbase - the expected number of distinct individuals sequenced
     """
 
@@ -52,7 +52,7 @@ def get_an_buffer(n:float, an_buffer={}) -> (float, dict):
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     an_buffer - dict for easy lookup of an(poolsize (->n))
     
-    Returns:
+    Returns
     an - value needed for fstar, alphastar, and betastar
     an_buffer - updated dict with key = n, for fast and easy lookup of an
     """
@@ -81,7 +81,7 @@ def get_bn_buffer(n:float, bn_buffer:dict={}) -> float:
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     bn_buffer -  dict for easy lookup of value from get_bn_buffer(poolsize (->n)
 
-    Returns:
+    Returns
     bn -  value needed for betastar
     """
 
@@ -107,7 +107,7 @@ def calculate_fstar(an:float, n:float) -> float:
     an - value needed for fstar, alphastar, and betastar
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     
-    Returns:
+    Returns
     fstar - used for alphastar and betastar calculations
     """
     return ((n - 3)/(an*(n - 1) - n))
@@ -118,7 +118,7 @@ def get_betastar_calculator(n:float, an_buffer:dict) -> float:
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     an_buffer - dict for easy lookup of an
 
-    Returns:
+    Returns
     bstar -  used in the estimation for the variance of (pi - theta)
     """
 
@@ -153,7 +153,7 @@ def get_alphastar_calculator(n:float) -> (float, dict):
     """
     poolsize (->n) - The haploid number of the pool which has been sequenced.
 
-    Returns:
+    Returns
     astar -  used in the estimation for the variance of (pi - theta)
     an_buffer - updated dict with key = n, for fast and easy lookup of an
     """
@@ -183,7 +183,7 @@ def get_ddivisor(n:int, mincoverage:int, snps:dict, theta:int, nbase_buffer:dict
     theta - result from get_theta_calculator() - Watterson's theta for the window
     nbase_buffer - dict with key=n for fast and easy lookup of nbase - the expected number of distince individuals sequenced
 
-    Returns:
+    Returns
     div - denominator of Tajima's D - estimator of standard deviation of (Tajima's pi - Tajima's theta)
     """
 
@@ -211,7 +211,7 @@ def get_thetadiv_buffer(b:int, n:int, M:int, thetadiv_buffer:dict, amnm_buffer:d
     amnm_buffer - dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
 
-    Returns:
+    Returns
     div -  value used to calculate it's reciprical in the summation of thetasum
     thetadiv_buffer - updated dict with key b:n:M permutation, for fast and easy lookup ...
         of value from get_thetadiv_buffer(b, poolsize (->n), eucov (->M), thetadiv_buffer, amnm_buffer)
@@ -246,7 +246,7 @@ def get_theta_calculator(b:int, n:int, snps:dict, amnm_buffer:dict, thetadiv_buf
     thetadiv_buffer - dict with key b:n:M permutation, for fast and easy lookup ...
         of value from get_thetadiv_buffer
 
-    Returns:
+    Returns
     thetasum - estimator of Watterson's Theta
     """
 
@@ -265,7 +265,7 @@ def binomial_term(M:int, n:int, m:int, k:int) -> float:
     m - iterator from get_pidiv_buffer(), for m in range(b, M+1-b, 1)
     k - iterator from get_aMnm_buffer(), for k in range(1, n, 1)
 
-    Returns:
+    Returns
     # The probability of having a first allele count of m in M reads from ...
         a pool of n with first allele count of k (m is the allele count ...
         in the reads, k is the allele count in the pool)
@@ -292,7 +292,7 @@ def get_aMnm_buffer(M:int, n:int, m:int, amnm_buffer:dict) -> (float, dict):
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     m - iterator from get_pidiv_buffer(), for m in range(b, M+1-b, 1)
 
-    Returns:
+    Returns
     toret - value from amnm_buffer[key]
     amnm_buffer - updated dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
@@ -324,7 +324,7 @@ def get_pidiv_buffer(b:int, n:int, M:int, amnm_buffer:dict, pidiv_buffer:dict={}
     pidiv_buffer - dict with key b:n:M permutations, for fast and easy lookup ...
         of value from get_pidiv_buffer()
 
-    Returns:
+    Returns
     div - value from pidiv_buffer[M:n:m permutation]
     amnm_buffer - updated dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
@@ -363,7 +363,7 @@ def get_pi_calculator(b:int, n:int, snps:dict, pidiv_buffer:dict={}, amnm_buffer
     amnm_buffer - dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
 
-    Returns:
+    Returns
     pisum - Tajima's pi for SNPs in window
     amnm_buffer - updated dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
@@ -408,7 +408,7 @@ def get_D_calculator(b:int, n:int, mincoverage:int, snps:dict, pidiv_buffer:dict
         parallelized pidiv_buffer before measure calc. Without this,
         there is no need to have it passed into get_D_calculator
 
-    Returns:
+    Returns
     d - Tajima's D estimate for window
     """
 
@@ -434,7 +434,7 @@ class VarianceExactCorrection:
     pidiv_buffer - dict with key b:n:M permutations, for fast and easy lookup ...
         of value from get_pidiv_buffer()
     
-    Returns:
+    Returns
     VarianceExactCorrection class object
     """
 
