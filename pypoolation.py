@@ -5,7 +5,7 @@ TODO: if Tajima's D is selected, return pi and theta (and maybe ddivisor)
 """
 
 import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time
-import pickle, numpy
+import pickle
 from os import path as op
 from typing import Union
 

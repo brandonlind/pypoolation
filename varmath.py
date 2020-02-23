@@ -11,6 +11,7 @@ def get_nbase_buffer(poolsize:int) -> float:
     -------
     nbase - the expected number of distinct individuals sequenced
     """
+    import numpy
 
     def _get_pij_matrix(maxcoverage:int, poolsize:int) -> numpy.matrix:
         import numpy, pandas
