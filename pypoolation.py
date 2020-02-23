@@ -5,7 +5,7 @@ TODO: if Tajima's D is selected, return pi and theta (and maybe ddivisor)
 """
 
 import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time, signal
-import itertools, pickle, numpy as np, math
+import itertools, pickle, numpy as np
 from os import path as op
 from typing import Union
 
@@ -357,7 +357,7 @@ def launch_engines(engines, profile):
         if len(lview) != engines:
             lview,dview = wait_for_engines(engines, profile)
         started = True
-    except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError) as e:
+    except (OSError, ipyparallel.error.NoEnginesRegistered, ipyparallel.error.TimeoutError):
         print("\tNo engines found ...")
         pass
 
@@ -445,6 +445,7 @@ def uni(lst):
 
 # def send_get_pidiv_buffer(**kwargs):
 #     """Parallelize varmath.get_pidiv_buffer()."""
+#     import math
 
 #     # get unique combos of b, n, and M
 #     uni_combos, uni_b, uni_M, uni_n = get_combos(kwargs['pop'], kwargs['snps'], kwargs['ploidy'], kwargs['dview'])
@@ -567,7 +568,7 @@ def get_windows(chrom, **kwargs):
 
         # get info for all SNPs within window
         for snp in df.loc[rows, locuscol]:
-            # if snp passes mincount (min count of the minor allele), min/maxcov flags 
+            # if snp passes mincount (min count of the minor allele), min/maxcov flags
             # (first part checks AD and RD so I don't have to determine minor allele)
             if all([df[f'{pop}.RD'][snp] >= mincount, df[f'{pop}.AD'][snp] >= mincount,
                     df[f'{pop}.DP'][snp] >= mincov, df[f'{pop}.DP'][snp] <= maxcov]):
@@ -688,7 +689,8 @@ def send_chrom_to_calculator(snps, lview, **kwargs):
     file = op.join(args.outdir, f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}.txt")
     measure_df.to_csv(file, sep='\t', index=False)
     # save input arguments
-    pkldump(args, f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}_ARGS.pkl")
+    pkldump(args, os.path.join(args.outdir, 
+                               f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}_ARGS.pkl"))
     # TODO: delete tmp files?
 
     return file
@@ -759,7 +761,7 @@ def main(pidiv_buffer:dict={}):
         print(ColorText("\n\tStopping ipcluster ...").bold())
         subprocess.call([shutil.which('ipcluster'), 'stop'])
 
-        
+
 if __name__ == '__main__':
     mytext = ColorText('''
 *****************************************************************************
