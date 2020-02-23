@@ -3,9 +3,12 @@
 
 def get_nbase_buffer(poolsize:int) -> float:
     """
+    Parameters
+    ----------
     poolsize - The haploid number of the pool which has been sequenced.
 
     Returns
+    -------
     nbase - the expected number of distinct individuals sequenced
     """
 
@@ -46,10 +49,13 @@ def get_nbase_buffer(poolsize:int) -> float:
 
 def get_an_buffer(n:float, an_buffer={}) -> (float, dict):
     """
+    Parameters
+    ----------
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     an_buffer - dict for easy lookup of an(poolsize (->n))
     
     Returns
+    -------
     an - value needed for fstar, alphastar, and betastar
     an_buffer - updated dict with key = n, for fast and easy lookup of an
     """
@@ -75,10 +81,13 @@ def get_an_buffer(n:float, an_buffer={}) -> (float, dict):
 
 def get_bn_buffer(n:float, bn_buffer:dict={}) -> float:
     """
+    Parameters
+    ----------
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     bn_buffer -  dict for easy lookup of value from get_bn_buffer(poolsize (->n)
 
     Returns
+    -------
     bn -  value needed for betastar
     """
 
@@ -101,10 +110,13 @@ def get_bn_buffer(n:float, bn_buffer:dict={}) -> float:
 
 def calculate_fstar(an:float, n:float) -> float:
     """
+    Parameters
+    ----------
     an - value needed for fstar, alphastar, and betastar
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     
     Returns
+    -------
     fstar - used for alphastar and betastar calculations
     """
     return ((n - 3)/(an*(n - 1) - n))
@@ -112,10 +124,13 @@ def calculate_fstar(an:float, n:float) -> float:
 
 def get_betastar_calculator(n:float, an_buffer:dict) -> float:
     """
+    Parameters
+    ----------
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     an_buffer - dict for easy lookup of an
 
     Returns
+    -------
     bstar -  used in the estimation for the variance of (pi - theta)
     """
 
@@ -148,9 +163,12 @@ def get_betastar_calculator(n:float, an_buffer:dict) -> float:
 
 def get_alphastar_calculator(n:float) -> (float, dict):
     """
+    Parameters
+    ----------
     poolsize (->n) - The haploid number of the pool which has been sequenced.
 
     Returns
+    -------
     astar -  used in the estimation for the variance of (pi - theta)
     an_buffer - updated dict with key = n, for fast and easy lookup of an
     """
@@ -172,6 +190,8 @@ def get_alphastar_calculator(n:float) -> (float, dict):
 
 def get_ddivisor(n:int, mincoverage:int, snps:dict, theta:int, nbase_buffer:dict={}) -> float:
     """
+    Parameters
+    ----------
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     mincoverage - The minimum coverage of a site, input by user. Sites with a lower coverage will not be considered.
     snps - dict from get_windows(). keys = locus names within a window. value = dict, with keys:
@@ -181,6 +201,7 @@ def get_ddivisor(n:int, mincoverage:int, snps:dict, theta:int, nbase_buffer:dict
     nbase_buffer - dict with key=n for fast and easy lookup of nbase - the expected number of distince individuals sequenced
 
     Returns
+    -------
     div - denominator of Tajima's D - estimator of standard deviation of (Tajima's pi - Tajima's theta)
     """
 
@@ -200,6 +221,8 @@ def get_ddivisor(n:int, mincoverage:int, snps:dict, theta:int, nbase_buffer:dict
 
 def get_thetadiv_buffer(b:int, n:int, M:int, thetadiv_buffer:dict, amnm_buffer:dict) -> (float, dict, dict):
     """
+    Parameters
+    ----------
     b - The minimum count of the minor allele, input by user.
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     eucov (->M) - value = total depth of coverage
@@ -209,6 +232,7 @@ def get_thetadiv_buffer(b:int, n:int, M:int, thetadiv_buffer:dict, amnm_buffer:d
         of value from get_aMnm_buffer()
 
     Returns
+    -------
     div -  value used to calculate it's reciprical in the summation of thetasum
     thetadiv_buffer - updated dict with key b:n:M permutation, for fast and easy lookup ...
         of value from get_thetadiv_buffer(b, poolsize (->n), eucov (->M), thetadiv_buffer, amnm_buffer)
@@ -232,7 +256,9 @@ def get_thetadiv_buffer(b:int, n:int, M:int, thetadiv_buffer:dict, amnm_buffer:d
 
 def get_theta_calculator(b:int, n:int, snps:dict, amnm_buffer:dict, thetadiv_buffer:dict={}) -> float:
     """Calculate Watterson's theta statistic.
-    
+
+    Parameters
+    ----------
     b - The minimum count of the minor allele, input by user.
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     snps - dict from get_windows(). keys = locus names within a window. value = dict, with keys:
@@ -244,6 +270,7 @@ def get_theta_calculator(b:int, n:int, snps:dict, amnm_buffer:dict, thetadiv_buf
         of value from get_thetadiv_buffer
 
     Returns
+    -------
     thetasum - estimator of Watterson's Theta
     """
 
@@ -257,12 +284,15 @@ def get_theta_calculator(b:int, n:int, snps:dict, amnm_buffer:dict, thetadiv_buf
 
 def binomial_term(M:int, n:int, m:int, k:int) -> float:
     """
+    Parameters
+    ----------
     eucov (->M) - value = total depth of coverage
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     m - iterator from get_pidiv_buffer(), for m in range(b, M+1-b, 1)
     k - iterator from get_aMnm_buffer(), for k in range(1, n, 1)
 
     Returns
+    -------
     # The probability of having a first allele count of m in M reads from ...
         a pool of n with first allele count of k (m is the allele count ...
         in the reads, k is the allele count in the pool)
@@ -285,11 +315,14 @@ def binomial_term(M:int, n:int, m:int, k:int) -> float:
 
 def get_aMnm_buffer(M:int, n:int, m:int, amnm_buffer:dict) -> (float, dict):
     """
+    Parameters
+    ----------
     eucov (->M) - value = total depth of coverage
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     m - iterator from get_pidiv_buffer(), for m in range(b, M+1-b, 1)
 
     Returns
+    -------
     toret - value from amnm_buffer[key]
     amnm_buffer - updated dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
@@ -313,6 +346,8 @@ def get_aMnm_buffer(M:int, n:int, m:int, amnm_buffer:dict) -> (float, dict):
 
 def get_pidiv_buffer(b:int, n:int, M:int, amnm_buffer:dict, pidiv_buffer:dict={}) -> (float, dict, dict):
     """
+    Parameters
+    ----------
     b - The minimum count of the minor allele, input by user.
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     eucov (->M) - value = total depth of coverage
@@ -322,6 +357,7 @@ def get_pidiv_buffer(b:int, n:int, M:int, amnm_buffer:dict, pidiv_buffer:dict={}
         of value from get_pidiv_buffer()
 
     Returns
+    -------
     div - value from pidiv_buffer[M:n:m permutation]
     amnm_buffer - updated dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
@@ -349,7 +385,9 @@ def get_pidiv_buffer(b:int, n:int, M:int, amnm_buffer:dict, pidiv_buffer:dict={}
 
 def get_pi_calculator(b:int, n:int, snps:dict, pidiv_buffer:dict={}, amnm_buffer:dict={}) -> (float, dict):
     """Calculate Tajima's pi.
-    
+
+    Parameters
+    ----------
     b - The minimum count of the minor allele, input by user.
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     snps - dict from get_windows(). keys = locus names within a window. value = dict, with keys:
@@ -361,6 +399,7 @@ def get_pi_calculator(b:int, n:int, snps:dict, pidiv_buffer:dict={}, amnm_buffer
         of value from get_aMnm_buffer()
 
     Returns
+    -------
     pisum - Tajima's pi for SNPs in window
     amnm_buffer - updated dict with value of M:n:m permutation, for fast and easy lookup ...
         of value from get_aMnm_buffer()
@@ -390,7 +429,9 @@ def get_pi_calculator(b:int, n:int, snps:dict, pidiv_buffer:dict={}, amnm_buffer
 
 def get_D_calculator(b:int, n:int, mincoverage:int, snps:dict, pidiv_buffer:dict={}) -> (float, dict):
     """Calculate Tajima's D (corrected).
-    
+
+    Parameters
+    ----------
     b - The minimum count of the minor allele.
     poolsize (->n) - The haploid number of the pool which has been sequenced.
     mincoverage - The minimum coverage of a site, input by user. Sites with a lower coverage will not be considered.
@@ -400,12 +441,14 @@ def get_D_calculator(b:int, n:int, mincoverage:int, snps:dict, pidiv_buffer:dict
     pidiv_buffer - dict with key b:n:M permutations, for fast and easy lookup ...
         of value from get_pidiv_buffer()
     
-    # notes:
+    Notes
+    -----
     - passing pidiv_buffer from get_D_calculator was from when I
         parallelized pidiv_buffer before measure calc. Without this,
         there is no need to have it passed into get_D_calculator
 
     Returns
+    -------
     d - Tajima's D estimate for window
     """
 
@@ -424,6 +467,8 @@ def get_D_calculator(b:int, n:int, mincoverage:int, snps:dict, pidiv_buffer:dict
 class VarianceExactCorrection:
     """Calculate popgen statistic from window.
 
+    Parameters
+    ----------
     mincoverage - The minimum coverage of a site. Sites with a lower coverage will not be considered.
     maxcoverage - The maximum coverage of a site. Sites with greater coverage will not be considered.
     poolsize (->n) - The haploid number of the pool which has been sequenced.
@@ -432,6 +477,7 @@ class VarianceExactCorrection:
         of value from get_pidiv_buffer()
 
     Returns
+    -------
     VarianceExactCorrection class object
     """
 

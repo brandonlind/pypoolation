@@ -5,7 +5,7 @@ TODO: if Tajima's D is selected, return pi and theta (and maybe ddivisor)
 """
 
 import os, sys, argparse, shutil, subprocess, pandas as pd, threading, ipyparallel, time
-import pickle
+import pickle, numpy
 from os import path as op
 from typing import Union
 
@@ -262,7 +262,7 @@ def askforinput(msg='Do you want to proceed?', tab='', newline='\n'):
     return inp
 
 
-def get_datatable(args, pop, chroms=None):
+def get_datatable(args, pop, chroms=None) -> pd.DataTable:
     """Load --input datatable.txt."""
     print(ColorText(f"\nReading in SNP datatable for {pop}...").bold())
 
@@ -388,7 +388,7 @@ def attach_data(**kwargs) -> None:
     return None
 
 
-def uni(lst):
+def uni(lst) -> list:
     """Return unqiue items from lst."""
     return list(set(lst))
 
@@ -472,7 +472,7 @@ def uni(lst):
 #     return buffdict
 
 
-def choose_pool(ploidy:dict, args, keep=None):
+def choose_pool(ploidy:dict, args, keep=None) -> dict:
     """Choose which the pool to use as a key to the ploidy dict."""
     keys = list(ploidy.keys())
     if len(keys) == 1:
@@ -501,7 +501,7 @@ def choose_pool(ploidy:dict, args, keep=None):
     return ploidy[pool]
 
 
-def get_ploidy(args):
+def get_ploidy(args) -> dict:
     """Get the ploidy of the populations of interest, reduce ploidy pkl."""
     # have user choose key to dict
     ploidy = choose_pool(pklload(args.ploidyfile), args)
@@ -521,7 +521,7 @@ def get_ploidy(args):
     return ploidy
 
 
-def get_windows(chrom, **kwargs):
+def get_windows(chrom, **kwargs) -> dict:
     """
     Get info for all SNPs meeting criteria for a given window size on a specific chrom.
 
@@ -577,7 +577,7 @@ def get_windows(chrom, **kwargs):
     return windows
 
 
-def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsize):
+def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsize) -> str:
     """Write window file to /tmp, combine later."""
     import os
     
@@ -599,7 +599,7 @@ def write_tmp_file(measures, chrom, pop, statistic, outdir, inputfile, windowsiz
     return file
 
 
-def send_windows(*args, **kwargs):
+def send_windows(*args, **kwargs) -> list:
     """Send each window to varmath.VarianceExactCorrection."""
     import numpy, varmath as vm
 
@@ -637,7 +637,7 @@ def send_windows(*args, **kwargs):
     return files
 
 
-def send_chrom_to_calculator(lview, **kwargs):
+def send_chrom_to_calculator(lview, **kwargs) -> str:
     """
     Parallelize varmath.VarianceExactCorrection by individual chroms.
 
@@ -678,14 +678,14 @@ def send_chrom_to_calculator(lview, **kwargs):
     file = op.join(args.outdir, f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}.txt")
     measure_df.to_csv(file, sep='\t', index=False)
     # save input arguments
-    pkldump(args, os.path.join(args.outdir, 
+    pkldump(args, os.path.join(args.outdir,
                                f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}_ARGS.pkl"))
     # TODO: delete tmp files?
 
     return file
 
 
-def check_pyversion():
+def check_pyversion() -> None:
     """Make sure python is 3.6 <= version < 3.8."""
     pyversion = float(str(sys.version_info[0]) + '.' + str(sys.version_info[1]))
     if not pyversion >= 3.6:
