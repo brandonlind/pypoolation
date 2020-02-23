@@ -1,7 +1,7 @@
 """Functions to calculate pi, theata, D."""
 
 
-import numpy, typing
+import numpy
 
 
 def get_nbase_buffer(poolsize:int) -> float:
@@ -403,8 +403,8 @@ def get_D_calculator(b:int, n:int, mincoverage:int, snps:dict, pidiv_buffer:dict
     pidiv_buffer - dict with key b:n:M permutations, for fast and easy lookup ...
         of value from get_pidiv_buffer()
     
-    # notes: 
-    - passing pidiv_buffer from get_D_calculator was from when I 
+    # notes:
+    - passing pidiv_buffer from get_D_calculator was from when I
         parallelized pidiv_buffer before measure calc. Without this,
         there is no need to have it passed into get_D_calculator
 
@@ -492,7 +492,7 @@ class VarianceExactCorrection:
     def _calculate_d(self, **kwargs):
         """Calculate and return Tajima's D for a window."""
         # TODO: from popoolation: _calculate_d : die if 3*$mincoverage < $poolsize
-            # die "Corrected Tajima's D error\n 
+            # die "Corrected Tajima's D error\n
             # Poolsize >> mincoverage (as internal aproximation: 3 * minimumcoverage < poolsize)" unless 3*$mincoverage < $poolsize;
         if kwargs['covercount'] == 0:
             return 0
