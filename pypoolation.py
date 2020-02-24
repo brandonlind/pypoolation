@@ -262,7 +262,7 @@ def askforinput(msg='Do you want to proceed?', tab='', newline='\n'):
     return inp
 
 
-def get_datatable(args, pop, chroms=None) -> pd.DataTable:
+def get_datatable(args, pop, chroms=None) -> pd.DataFrame:
     """Load --input datatable.txt."""
     print(ColorText(f"\nReading in SNP datatable for {pop}...").bold())
 
@@ -538,7 +538,7 @@ def get_windows(chrom, **kwargs) -> dict:
     pop = kwargs['pop']
 
     # set up df
-    df = kwargs['snps'].loc[chrom,:].copy()
+    df = snps.loc[chrom,:].copy()
     if isinstance(df, pandas.core.series.Series):
         # if chrom has only one row
         df = pandas.DataFrame(df).T
@@ -646,7 +646,7 @@ def send_chrom_to_calculator(lview, **kwargs) -> str:
     import tqdm, math
 
     # determine how to divy up jobs
-    chroms = uni(kwargs['snps'][kwargs['chromcol']])
+    chroms = uni(snps[kwargs['chromcol']])
     jobsize = math.ceil(len(chroms)/1000)
 
     # send jobs to engines
@@ -716,7 +716,7 @@ def main(pidiv_buffer:dict={}):
     # iterate through pops
     for pop in ploidy:
         # read in VariantsToTable.txt file, filter chroms based on args
-#         global snps  # for debugging send_windows()
+        global snps
         snps, chromcol = get_datatable(args, pop)
 
         # get ipcluster engines
@@ -741,7 +741,7 @@ def main(pidiv_buffer:dict={}):
                     dview=dview)
 
         # calculate measure
-        file = send_chrom_to_calculator(lview, snps=snps, chromcol=chromcol, args=args, pop=pop,
+        file = send_chrom_to_calculator(lview, chromcol=chromcol, args=args, pop=pop,
                                         pidiv_buffer=pidiv_buffer, ploidy=ploidy)
         print(ColorText("\nWrote stats to ").green().__str__() + ColorText(file).bold().green().__str__())
         print(ColorText("\nWrote pypoolation arguments used to ").green().__str__() +
