@@ -10,6 +10,33 @@ This code was written and tested with python 3.7.6. It seemed that python3.8 had
 
 Module versions used can be mirrored with `pip install -r requirements.txt`
 
+### example
+The following is an example of environment setup and pypoolation execution. If any errors are encountered when running pypoolation, make sure to execute `ipcluster stop` before re-running analysis.
+
+```
+# create new environment
+conda create --name py37 python=3.7
+
+# activate env
+conda activate py37
+
+# install reqs
+cd /data/programs/pypoolation
+pip install -r requirements.txt
+
+# export pythonpath
+export PYTHONPATH="${PYTHONPATH}:/data/programs/pypoolation"
+
+# run pypoolation to calculate pi for pool named LPp19-2S_R1 using 20 CPUs
+# (instantiation of INPUT, OUTDIR and PLOIDYFILE not shown)
+python pypoolation.py -i INPUT \
+-o OUTDIR \
+-p PLOIDYFILE \
+-e 20 \
+-m pi \
+--which-pops LPp19-2S_R1
+```
+
 ## Usage
 ```
 usage: pypoolation.py [-h] -i INPUT -o OUTDIR -m MEASURE -p PLOIDYFILE -e
