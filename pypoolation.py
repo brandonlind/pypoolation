@@ -61,7 +61,7 @@ def watch_async(jobs:list, phase=None) -> None:
                     job_idx.remove(j)
 
 
-class ColorText():
+class ColorText:
     """
     Use ANSI escape sequences to print colors +/- bold/underline to bash terminal.
     """
@@ -205,7 +205,7 @@ efficient. Data was further filtered after output.  Default=0.0''')
                         required=False,
                         default=1000,
                         dest="windowsize",
-                        type=str,
+                        type=int,
                         help='''The size of the sliding window. Windows are centered on
 individual SNPs, so any SNP within 0.5*windowsize bps
 from the current SNP will be included in the window. Default=1000bp''')
@@ -262,7 +262,7 @@ def askforinput(msg='Do you want to proceed?', tab='', newline='\n'):
     return inp
 
 
-def get_datatable(args, pop, chroms=None) -> pd.DataFrame:
+def get_datatable(args, pop, chroms=None) -> (pd.DataFrame, str):
     """Load --input datatable.txt."""
     print(ColorText(f"\nReading in SNP datatable for {pop}...").bold())
 
@@ -472,7 +472,7 @@ def uni(lst) -> list:
 #     return buffdict
 
 
-def choose_pool(ploidy:dict, args, keep=None) -> dict:
+def choose_pool(ploidy:dict, args, pool=None) -> dict:
     """Choose which the pool to use as a key to the ploidy dict."""
     keys = list(ploidy.keys())
     if len(keys) == 1:
@@ -481,8 +481,8 @@ def choose_pool(ploidy:dict, args, keep=None) -> dict:
 
     print(ColorText('\nPlease choose a pool that contains the population of interest.').bold())
     nums = []
-    for i,pool in enumerate(keys):
-        print('\t%s %s' % (i, pool))
+    for i,pool_name in enumerate(keys):
+        print('\t%s %s' % (i, pool_name))
         nums.append(i)
 
     while True:
