@@ -266,8 +266,15 @@ def get_datatable(args, pop, chroms=None) -> (pd.DataFrame, str):
     """Load --input datatable.txt."""
     print(ColorText(f"\nReading in SNP datatable for {pop}...").bold())
 
-    # read in path
-    df = pd.read_table(args.input)
+    # first get column names so that large dataframes are read in faster
+    allcols = subprocess.check_output([shutil.which('head'), '-1', args.input]).decode('utf-8').split('\n')[0].split('\t')
+    # get columns that are needed by pypoolation
+    cols = [col for col in allcols if any(['chrom' in col.lower(),
+                                           'pos' in col.lower(),
+                                           f'{pop}.' in col,
+                                           'locus' in col.lower()])]
+    # use these cols to read in dataframe
+    df = pd.read_table(args.input, usecols=cols)
 
     # see if user supplied specific chromosomes/contigs to analyze
     if args.chromfile is not None:
@@ -290,9 +297,8 @@ def get_datatable(args, pop, chroms=None) -> (pd.DataFrame, str):
     keepcols = [col for col in df.columns if '.' not in col or pop in col]
     df = df[keepcols].copy()
 
-    # reduce rows
+    # reduce rows by removing missing data (np.nans)
     df = df[df[f'{pop}.FREQ']==df[f'{pop}.FREQ']].copy()  # only keep filtered SNPs (filtered SNPs don't have a FREQ)
-    df = df[df[f'{pop}.FREQ']!= '0%'].copy()  # remove SNPs that are invariable in the current pop
 
     # set index to chromcol for db-like lookups
     df.index = df[chromcol].tolist()
@@ -668,6 +674,7 @@ def send_chrom_to_calculator(lview, **kwargs) -> str:
     watch_async(jobs, phase='send_windows')
 
     # get tmp file names, read in, concatenate into one df
+    print(ColorText("\nGathering results ...").bold())
     measure_df = pd.concat([pd.read_table(f) for j in jobs for f in j.r])
 
     # write real file
@@ -675,12 +682,12 @@ def send_chrom_to_calculator(lview, **kwargs) -> str:
     pop = kwargs['pop']
     bname = os.path.basename(args.input).replace(".txt", "")
     # save statistics file
+    print(ColorText("\nWriting results to file ...").bold())
     file = op.join(args.outdir, f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}.txt")
     measure_df.to_csv(file, sep='\t', index=False)
     # save input arguments
     pkldump(args, os.path.join(args.outdir,
                                f"{pop}_{args.measure}_{args.windowsize}bp-windows_{bname}_ARGS.pkl"))
-    # TODO: delete tmp files?
 
     return file
 
@@ -702,6 +709,7 @@ FAIL: exiting pypoolation.py'''
 
 
 def main(pidiv_buffer:dict={}):
+    from tqdm import tqdm as pbar
     # make sure it's not python3.8
     check_pyversion()
 
@@ -722,18 +730,10 @@ def main(pidiv_buffer:dict={}):
         # get ipcluster engines
         lview,dview = launch_engines(args.engines, args.profile)
 
-        # attach data on all engines
-        attach_data(snps=snps, ploidy=ploidy, dview=dview)
-
-        # get pidiv_buffer, attach data to all engines  # A nice idea, but takes too long
-#         global pidiv_buffer
-#         pidiv_buffer = send_get_pidiv_buffer(snps=snps, lview=lview, chromcol=chromcol,
-#                                              ploidy=ploidy, pop=pop, engines=args.engines,
-#                                              dview=dview)
-#         print('\tlen(pidiv_buffer) = ', len(pidiv_buffer))
-
-        # attach functions and dict to engines (used in and downstream of send_to_calculate())
-        attach_data(write_tmp_file=write_tmp_file,
+        # attach data, functions, and dict to engines (used in and downstream of send_to_calculate())
+        attach_data(snps=snps,
+                    ploidy=ploidy,
+                    write_tmp_file=write_tmp_file,
                     send_windows=send_windows,
                     send_chrom_to_calculator=send_chrom_to_calculator,
                     get_windows=get_windows,
@@ -748,9 +748,16 @@ def main(pidiv_buffer:dict={}):
               ColorText(file.replace(".txt", "_ARGS.pkl")).green().bold().__str__())
 
         # kill ipcluster to avoid mem problems (restart next loop)
-        print(ColorText("\n\tStopping ipcluster ...").bold())
+        print(ColorText("\nStopping ipcluster ...").bold())
         subprocess.call([shutil.which('ipcluster'), 'stop'])
+        
+        # remove temporary files
+        print(ColorText("\nRemoving temporary files ...").bold())
+        tmpdir = os.path.join(args.outdir, 'tmp')
+        for f in pbar(os.listdir(tmpdir)):
+            os.remove(os.path.join(tmpdir, f))
 
+        print(ColorText("\nDONE!!!").bold().green())
 
 if __name__ == '__main__':
     mytext = ColorText('''
