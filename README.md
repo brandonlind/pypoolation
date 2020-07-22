@@ -3,12 +3,39 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/1d35004dc83c4bf492286e4f71a477a0)](https://app.codacy.com/manual/brandonlind/pypoolation?utm_source=github.com&utm_medium=referral&utm_content=brandonlind/pypoolation&utm_campaign=Badge_Grade_Dashboard)
 
 # pypoolation
-Using ipcluster engines to parallelize calculations from [varscan_pipeline](https://github.com/CoAdapTree/varscan_pipeline) outfiles, report Tajimas'D and/or Tajima's pi and/or Watterson's theta over user-defined windows (as in [popoolation](https://sourceforge.net/p/popoolation/code/HEAD/tree/trunk/Modules/VarianceExactCorrection.pm)). Alternatively, this code is likely to work relatively well with any txt files output by sending a VarScan vcf output to GATK's VariantsToTable.
+Using ipcluster engines to parallelize calculations from [varscan_pipeline](https://github.com/CoAdapTree/varscan_pipeline) outfiles, report Tajimas'D and/or Tajima's pi and/or Watterson's theta over user-defined windows (as in VarianceExactCorrection.pm from [popoolation](https://sourceforge.net/p/popoolation/code/HEAD/tree/trunk/Modules/VarianceExactCorrection.pm)). Alternatively, this code is likely to work relatively well with any txt files output by sending a VarScan vcf output to GATK's VariantsToTable.
 
 ## Assumed environment
 This code was written and tested with python 3.7.6. It seemed that python3.8 had issues with parallelization implementation; this issue was not addressed in current version.
 
 Module versions used can be mirrored with `pip install -r requirements.txt`
+
+### example
+The following is an example of environment setup and pypoolation execution (steps to `git clone` repo into `/data/programs`, and installing anaconda are not shown). If any errors are encountered when running pypoolation, make sure to execute `ipcluster stop` before re-running analysis. Creating an environment and installing requirements.txt only needs to be done once, afterwards activating the environment + exporting the PYTHONPATH is sufficient to run pypoolation.
+
+```
+# create new environment
+conda create --name py37 python=3.7
+
+# activate env
+conda activate py37
+
+# install reqs
+cd /data/programs/pypoolation
+pip install -r requirements.txt
+
+# export pythonpath
+export PYTHONPATH="${PYTHONPATH}:/data/programs/pypoolation"
+
+# run pypoolation to calculate pi for pool named LPp19-2S_R1 using 20 CPUs
+# (instantiation of INPUT, OUTDIR and PLOIDYFILE not shown)
+python pypoolation.py -i INPUT \
+-o OUTDIR \
+-p PLOIDYFILE \
+-e 20 \
+-m pi \
+--which-pops LPp19-2S_R1
+```
 
 ## Usage
 ```
